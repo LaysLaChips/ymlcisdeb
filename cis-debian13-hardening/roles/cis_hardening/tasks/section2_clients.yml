@@ -1,0 +1,40 @@
+---
+# ==============================================================================
+# SECTION 2.2 - Service Clients (Legacy & Insecure Clients)
+# ==============================================================================
+
+- name: "2.2 | Ensure unnecessary client services are not installed"
+  ansible.builtin.package:
+    name: "{{ item.package }}"
+    state: absent
+  loop:
+    # 2.2.1 Ensure ftp client is not installed
+    - { rule: '2.2.1', package: 'ftp', allow: "{{ cis_allow_ftp_client }}" }
+    
+    # 2.2.2 Ensure ldap-utils is not installed
+    # Note: Nécessaire uniquement si vous devez faire des requêtes LDAP manuelles depuis ce serveur.
+    # L'authentification PAM LDAP n'a pas besoin de ce paquet (qui contient ldapsearch, etc.).
+    - { rule: '2.2.2', package: 'ldap-utils', allow: "{{ cis_allow_ldap_client }}" }
+
+    # 2.2.3 Ensure nis is not installed
+    # NIS (YP) est un protocole d'annuaire très vieux et non sécurisé.
+    - { rule: '2.2.3', package: 'nis', allow: "{{ cis_allow_nis_client }}" }
+
+    # 2.2.4 Ensure rsh client is not installed
+    # Inclut rsh-client, rlogin, rcp. Remplacé par la suite SSH.
+    - { rule: '2.2.4', package: 'rsh-client', allow: "{{ cis_allow_rsh_client }}" }
+
+    # 2.2.5 Ensure talk client is not installed
+    - { rule: '2.2.5', package: 'talk', allow: "{{ cis_allow_talk_client }}" }
+
+    # 2.2.6 Ensure telnet client is not installed
+    # Le CIS interdit le client telnet car il transmet tout en clair.
+    # Conseil Admin : Pour tester si un port est ouvert, utilisez 'nc -zv host port' (netcat) ou 'curl -v telnet://host:port'
+    - { rule: '2.2.6', package: 'telnet', allow: "{{ cis_allow_telnet_client }}" }
+
+  # On supprime le paquet UNIQUEMENT si la variable 'allow' est false.
+  when: not item.allow | bool
+  tags:
+    - cis_2.2
+    - clients
+    - scored

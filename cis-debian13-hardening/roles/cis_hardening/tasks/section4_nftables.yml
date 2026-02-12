@@ -1,0 +1,133 @@
+---
+# ==============================================================================
+# SECTION 4.2 - Configure Firewalls (Nftables)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Nettoyage des anciens firewalls (CIS 4.1 & 4.3)
+# ------------------------------------------------------------------------------
+
+- name: "4.1 | Ensure UFW is uninstalled or disabled"
+  block:
+    - name: "4.1 | Stop UFW service"
+      ansible.builtin.service:
+        name: ufw
+        state: stopped
+        enabled: no
+      ignore_errors: yes # Si ufw n'est pas là, pas grave
+
+    - name: "4.1 | Uninstall UFW"
+      ansible.builtin.package:
+        name: ufw
+        state: absent
+  tags:
+    - cis_4.1
+    - ufw
+    - firewall
+
+- name: "4.3 | Ensure IPTables is not persistent"
+  ansible.builtin.package:
+    name: iptables-persistent
+    state: absent
+  tags:
+    - cis_4.3
+    - iptables
+
+# ------------------------------------------------------------------------------
+# 2. Installation de Nftables (CIS 4.2.1)
+# ------------------------------------------------------------------------------
+
+- name: "4.2.1 | Ensure nftables is installed"
+  ansible.builtin.package:
+    name: nftables
+    state: present
+  tags:
+    - cis_4.2.1
+    - nftables
+    - scored
+
+# ------------------------------------------------------------------------------
+# 3. Configuration des règles (CIS 4.2.4 à 4.2.9)
+# ------------------------------------------------------------------------------
+# On écrit directement la configuration dans /etc/nftables.conf.
+# Ce fichier est chargé automatiquement au démarrage par le service systemd.
+
+- name: "4.2.x | Configure /etc/nftables.conf"
+  ansible.builtin.copy:
+    dest: /etc/nftables.conf
+    owner: root
+    group: root
+    mode: '0750' # Seul root doit pouvoir lire les règles
+    content: |
+      #!/usr/sbin/nft -f
+
+      # Vider les règles existantes
+      flush ruleset
+
+      table inet filter {
+          # CHAIN INPUT (Trafic entrant)
+          # Politique par défaut : DROP (CIS 4.2.7)
+          chain input {
+              type filter hook input priority 0; policy drop;
+
+              # CIS 4.2.5 - Accepter le trafic local (loopback)
+              iif "lo" accept
+
+              # CIS 4.2.6 - Accepter les connexions déjà établies (Stateful)
+              # Important : permet au serveur de recevoir les réponses à ses propres requêtes
+              ct state established,related accept
+
+              # Accepter les paquets invalides (optionnel, souvent drop par sécurité)
+              ct state invalid drop
+
+              # ICMP (Ping)
+              {% if cis_nftables_allow_icmp %}
+              ip protocol icmp icmp type echo-request accept
+              ip6 protocol icmpv6 icmpv6 type echo-request accept
+              {% endif %}
+
+              # Ports TCP Ouverts (SSH, Web...)
+              {% if cis_nftables_allowed_tcp_ports | length > 0 %}
+              tcp dport { {{ cis_nftables_allowed_tcp_ports | join(', ') }} } accept
+              {% endif %}
+
+              # Ports UDP Ouverts
+              {% if cis_nftables_allowed_udp_ports | length > 0 %}
+              udp dport { {{ cis_nftables_allowed_udp_ports | join(', ') }} } accept
+              {% endif %}
+          }
+
+          # CHAIN FORWARD (Routage)
+          # Politique par défaut : DROP (CIS 4.2.7)
+          # Un serveur sécurisé ne doit pas router de paquets sauf si c'est une gateway.
+          chain forward {
+              type filter hook forward priority 0; policy drop;
+          }
+
+          # CHAIN OUTPUT (Trafic sortant)
+          # Politique par défaut : ACCEPT (Pour faciliter les mises à jour et logs)
+          # Le CIS niveau 2 demande parfois DROP, mais c'est complexe à gérer (DNS, NTP, Repo...).
+          chain output {
+              type filter hook output priority 0; policy accept;
+          }
+      }
+  notify: reload-nftables
+  tags:
+    - cis_4.2
+    - nftables
+    - configuration
+    - scored
+
+# ------------------------------------------------------------------------------
+# 4. Activation du service (CIS 4.2.8)
+# ------------------------------------------------------------------------------
+
+- name: "4.2.8 | Ensure nftables service is enabled"
+  ansible.builtin.service:
+    name: nftables
+    enabled: yes
+    state: started
+  tags:
+    - cis_4.2.8
+    - nftables
+    - service

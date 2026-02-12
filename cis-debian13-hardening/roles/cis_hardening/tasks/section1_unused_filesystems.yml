@@ -1,0 +1,50 @@
+---
+# ==============================================================================
+# CIS 1.1.1 - Disable unused filesystems
+# ==============================================================================
+# Ce fichier traite les règles :
+# 1.1.1.1 Ensure mounting of cramfs filesystems is disabled
+# 1.1.1.2 Ensure mounting of freevxfs filesystems is disabled
+# 1.1.1.3 Ensure mounting of jffs2 filesystems is disabled
+# 1.1.1.4 Ensure mounting of hfs filesystems is disabled
+# 1.1.1.5 Ensure mounting of hfsplus filesystems is disabled
+# 1.1.1.6 Ensure mounting of squashfs filesystems is disabled
+# 1.1.1.7 Ensure mounting of udf filesystems is disabled
+# ==============================================================================
+
+- name: "1.1.1 | Disable unused filesystems | Create modprobe blacklist files"
+  ansible.builtin.copy:
+    dest: "/etc/modprobe.d/{{ item }}.conf"
+    content: "install {{ item }} /bin/true\n"
+    mode: '0644'
+    owner: root
+    group: root
+  loop:
+    - cramfs
+    - freevxfs
+    - jffs2
+    - hfs
+    - hfsplus
+    - squashfs
+    - udf
+  tags:
+    - cis_1.1.1
+    - filesystem
+    - scored
+
+- name: "1.1.1 | Disable unused filesystems | Unload modules if active"
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: absent
+  loop:
+    - cramfs
+    - freevxfs
+    - jffs2
+    - hfs
+    - hfsplus
+    - squashfs
+    - udf
+  tags:
+    - cis_1.1.1
+    - filesystem
+    - scored

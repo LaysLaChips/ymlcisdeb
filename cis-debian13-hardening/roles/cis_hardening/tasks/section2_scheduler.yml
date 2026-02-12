@@ -1,0 +1,94 @@
+---
+# ==============================================================================
+# SECTION 2.4 - Job Schedulers (Cron & At)
+# ==============================================================================
+
+# 2.4.1.1 - Ensure cron daemon is enabled and running
+- name: "2.4.1.1 | Ensure cron daemon is enabled and running"
+  ansible.builtin.service:
+    name: cron
+    state: started
+    enabled: yes
+  tags:
+    - cis_2.4.1.1
+    - cron
+    - scored
+
+# 2.4.1.2 to 2.4.1.7 - Ensure permissions on cron configuration
+# On boucle sur tous les dossiers/fichiers critiques pour forcer root:root et les bonnes perms.
+- name: "2.4.1.x | Ensure permissions on cron directories and files are configured"
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: '/etc/crontab',       mode: '0600' } # 2.4.1.2
+    - { path: '/etc/cron.hourly',   mode: '0700' } # 2.4.1.3
+    - { path: '/etc/cron.daily',    mode: '0700' } # 2.4.1.4
+    - { path: '/etc/cron.weekly',   mode: '0700' } # 2.4.1.5
+    - { path: '/etc/cron.monthly',  mode: '0700' } # 2.4.1.6
+    - { path: '/etc/cron.d',        mode: '0700' } # 2.4.1.7
+  tags:
+    - cis_2.4.1
+    - cron
+    - permissions
+    - scored
+
+# 2.4.1.8 - Ensure cron is restricted to authorized users
+# La logique : On supprime cron.deny (liste noire) et on crée cron.allow (liste blanche).
+
+- name: "2.4.1.8 | Ensure /etc/cron.deny is removed"
+  ansible.builtin.file:
+    path: /etc/cron.deny
+    state: absent
+  tags:
+    - cis_2.4.1.8
+    - cron
+    - scored
+
+- name: "2.4.1.8 | Ensure /etc/cron.allow is configured"
+  ansible.builtin.copy:
+    dest: /etc/cron.allow
+    content: "{{ cis_cron_allowed_users | join('\n') }}\n"
+    owner: root
+    group: root
+    mode: '0600' # Seul root peut voir qui a le droit de faire des crons
+  tags:
+    - cis_2.4.1.8
+    - cron
+    - scored
+
+# 2.4.2 - Configure 'at'
+# Si 'at' n'est pas utilisé (cas le plus fréquent), on le désinstalle ou on le restreint.
+
+- name: "2.4.2.x | Ensure at is restricted to authorized users (deny removal)"
+  ansible.builtin.file:
+    path: /etc/at.deny
+    state: absent
+  tags:
+    - cis_2.4.2
+    - at
+    - scored
+
+- name: "2.4.2.x | Ensure /etc/at.allow is configured"
+  ansible.builtin.copy:
+    dest: /etc/at.allow
+    content: "root\n" # Par défaut, seulement root si 'at' est installé
+    owner: root
+    group: root
+    mode: '0600'
+  # On le fait même si 'at' n'est pas installé, pour sécuriser au cas où il le serait plus tard.
+  tags:
+    - cis_2.4.2
+    - at
+    - scored
+
+- name: "2.4.2.x | Remove at package if not needed"
+  ansible.builtin.package:
+    name: at
+    state: absent
+  when: not cis_allow_at_service | bool
+  tags:
+    - cis_2.4.2
+    - at

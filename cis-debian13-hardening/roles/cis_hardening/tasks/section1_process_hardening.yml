@@ -1,0 +1,90 @@
+---
+# ==============================================================================
+# SECTION 1.5 - Additional Process Hardening
+# ==============================================================================
+
+# 1.5.1 - Ensure core dumps are restricted
+# Cette règle empêche la création de fichiers "core" contenant la mémoire RAM d'un processus crashé.
+- name: "1.5.1 | Ensure core dumps are restricted (limits.conf)"
+  community.general.pam_limits:
+    domain: '*'
+    limit_type: hard
+    limit_item: core
+    value: "{{ 'unlimited' if cis_allow_coredumps else '0' }}"
+  tags:
+    - cis_1.5.1
+    - coredumps
+    - scored
+
+- name: "1.5.1 | Ensure core dumps are restricted (sysctl)"
+  ansible.posix.sysctl:
+    name: fs.suid_dumpable
+    value: '0'
+    state: present
+    reload: yes
+  when: not cis_allow_coredumps # On ne le fait que si on veut VRAIMENT bloquer
+  tags:
+    - cis_1.5.1
+    - coredumps
+    - scored
+
+# Si on utilise systemd-coredump, il faut aussi le configurer
+- name: "1.5.1 | Ensure systemd-coredump storage is disabled"
+  ansible.builtin.lineinfile:
+    path: /etc/systemd/coredump.conf
+    regexp: '^Storage='
+    line: 'Storage=none'
+    create: yes
+  when: not cis_allow_coredumps
+  notify: systemd-reload # Handler à créer si besoin, ou juste ignorer pour l'instant
+  tags:
+    - cis_1.5.1
+    - coredumps
+
+# 1.5.2 - Ensure XD/NX support is enabled
+# C'est une vérification hardware/kernel. On s'assure que le kernel le voit.
+# On ne peut pas "activer" le BIOS via Ansible, mais on peut vérifier le dmesg.
+- name: "1.5.2 | Check for XD/NX support in kernel logs"
+  ansible.builtin.command: "dmesg"
+  register: dmesg_out
+  changed_when: false
+  failed_when: "'NX (Execute Disable) protection: active' not in dmesg_out.stdout and 'NX-protecting' not in dmesg_out.stdout"
+  ignore_errors: yes # On ignore l'erreur pour ne pas bloquer le playbook, mais ça apparaîtra en rouge.
+  tags:
+    - cis_1.5.2
+    - hardware
+    - scored
+
+# 1.5.3 - Ensure address space layout randomization (ASLR) is enabled
+# Règle standard, sauf si vieux binaires 
+- name: "1.5.3 | Ensure address space layout randomization (ASLR) is enabled"
+  ansible.posix.sysctl:
+    name: kernel.randomize_va_space
+    value: '2'
+    state: present
+    reload: yes
+  tags:
+    - cis_1.5.3
+    - memory
+    - scored
+
+# 1.5.4 - Ensure prelink is disabled
+# Prelink modifie les binaires pour accélérer le démarrage, mais casse l'intégrité (AIDE) et l'ASLR.
+# Sur Debian 13, il n'est généralement pas installé par défaut.
+- name: "1.5.4 | Ensure prelink is disabled | Restore binaries"
+  ansible.builtin.command: "prelink -ua"
+  failed_when: false # N'échoue pas si prelink n'est pas installé
+  changed_when: false
+  tags:
+    - cis_1.5.4
+    - prelink
+    - scored
+
+- name: "1.5.4 | Ensure prelink is disabled | Remove package"
+  ansible.builtin.package:
+    name: prelink
+    state: absent
+  tags:
+    - cis_1.5.4
+    - prelink
+    - scored

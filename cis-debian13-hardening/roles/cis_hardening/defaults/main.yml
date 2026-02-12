@@ -1,0 +1,84 @@
+# ------------------------------------------------------------------------------
+# SECTION 1.5 VARIABLES
+# ------------------------------------------------------------------------------
+# Mettre à 'true' si vous avez besoin de debuguer des crashs applicatifs.
+# Si 'false' (défaut CIS), les core dumps sont strictement interdits.
+cis_allow_coredumps: false
+
+# ------------------------------------------------------------------------------
+# SECTION 2.1 - SERVER SERVICES VARIABLES
+# ------------------------------------------------------------------------------
+# Mettre à 'true' si le serveur DOIT fournir ce service.
+# Par défaut (false), le service sera désactivé ou désinstallé.
+
+cis_allow_autofs: false       # 2.1.1
+cis_allow_avahi: false        # 2.1.2
+cis_allow_dhcp_server: false  # 2.1.3
+cis_allow_dns_server: false   # 2.1.4 (Bind9)
+cis_allow_dnsmasq: false      # 2.1.5
+cis_allow_ftp_server: false   # 2.1.6
+cis_allow_ldap_server: false  # 2.1.7
+cis_allow_mail_server: false  # 2.1.8 (IMAP/POP)
+cis_allow_nfs_server: false   # 2.1.9
+cis_allow_print_server: false # 2.1.11 (CUPS)
+cis_allow_rpcbind: false      # 2.1.12
+cis_allow_rsync_server: false # 2.1.13
+cis_allow_samba: false        # 2.1.14
+cis_allow_snmp: false         # 2.1.15
+cis_allow_tftp_server: false  # 2.1.17
+cis_allow_web_proxy: false    # 2.1.18 (Squid)
+cis_allow_web_server: false   # 2.1.19 (Apache/Nginx)
+cis_allow_x11_server: false   # 2.1.21 (X Window)
+
+# ------------------------------------------------------------------------------
+# SECTION 2.2 - CLIENT SERVICES VARIABLES
+# ------------------------------------------------------------------------------
+# Mettre à 'true' si vous avez besoin de ces outils (ex: sur poste admin).
+
+cis_allow_ftp_client: false    # 2.2.1 (Utiliser sftp/scp à la place)
+cis_allow_ldap_client: false   # 2.2.2 (ldap-utils)
+cis_allow_nis_client: false    # 2.2.3 (NIS est obsolète et insécure)
+cis_allow_rsh_client: false    # 2.2.4 (Utiliser SSH)
+cis_allow_talk_client: false   # 2.2.5 (Obsolète)
+cis_allow_telnet_client: false # 2.2.6 (Utiliser nc/netcat pour tester les ports)
+
+# ------------------------------------------------------------------------------
+# SECTION 2.3 - TIME SYNCHRONIZATION (CHRONY)
+# ------------------------------------------------------------------------------
+# Liste des serveurs NTP à utiliser dans chrony.conf
+cis_ntp_servers:
+  - "0.debian.pool.ntp.org"
+  - "1.debian.pool.ntp.org"
+  - "2.debian.pool.ntp.org"
+  - "3.debian.pool.ntp.org"
+
+# ------------------------------------------------------------------------------
+# SECTION 2.4 - JOB SCHEDULERS (CRON/AT)
+# ------------------------------------------------------------------------------
+# Liste des utilisateurs autorisés à utiliser crontab -e
+cis_cron_allowed_users:
+  - root
+# Mettre à 'true' si vous utilisez 'at' (tâches planifiées ponctuelles).
+# Le CIS recommande de restreindre ou supprimer.
+cis_allow_at_service: false
+
+# ------------------------------------------------------------------------------
+# SECTION 3 - NETWORK CONFIGURATION
+# ------------------------------------------------------------------------------
+# Mettre à 'true' pour désactiver totalement IPv6 (Recommandé si non utilisé)
+cis_disable_ipv6: true
+
+# ------------------------------------------------------------------------------
+# SECTION 4 - FIREWALL (NFTABLES)
+# ------------------------------------------------------------------------------
+# Ports TCP à ouvrir en entrée (ex: 22=SSH, 80=HTTP, 443=HTTPS)
+cis_nftables_allowed_tcp_ports:
+  - 22
+  # - 80
+  # - 443
+
+# Ports UDP à ouvrir (ex: 123=NTP, 53=DNS si serveur)
+cis_nftables_allowed_udp_ports: []
+
+# Autoriser le ping (ICMP) ? (Recommandé pour le diagnostic)
+cis_nftables_allow_icmp: true

@@ -1,0 +1,81 @@
+---
+# ==============================================================================
+# SECTION 2.1 - Configure Server Services
+# ==============================================================================
+# Objectif : S'assurer que les services non nécessaires ne sont pas installés ou activés.
+
+# 2.1.x - Loop to remove unwanted server packages
+# Cette tâche gère la majorité des règles (2.1.1 à 2.1.21)
+- name: "2.1 | Ensure unnecessary server services are not installed"
+  ansible.builtin.package:
+    name: "{{ item.package }}"
+    state: absent
+  loop:
+    - { rule: '2.1.1',  package: 'autofs',        allow: "{{ cis_allow_autofs }}" }
+    - { rule: '2.1.2',  package: 'avahi-daemon',  allow: "{{ cis_allow_avahi }}" }
+    - { rule: '2.1.3',  package: 'isc-dhcp-server', allow: "{{ cis_allow_dhcp_server }}" }
+    - { rule: '2.1.3',  package: 'isc-dhcp-server6', allow: "{{ cis_allow_dhcp_server }}" }
+    - { rule: '2.1.4',  package: 'bind9',         allow: "{{ cis_allow_dns_server }}" }
+    - { rule: '2.1.5',  package: 'dnsmasq',       allow: "{{ cis_allow_dnsmasq }}" }
+    - { rule: '2.1.6',  package: 'vsftpd',        allow: "{{ cis_allow_ftp_server }}" }
+    - { rule: '2.1.6',  package: 'proftpd',       allow: "{{ cis_allow_ftp_server }}" }
+    - { rule: '2.1.7',  package: 'slapd',         allow: "{{ cis_allow_ldap_server }}" }
+    - { rule: '2.1.8',  package: 'dovecot-imapd', allow: "{{ cis_allow_mail_server }}" }
+    - { rule: '2.1.8',  package: 'dovecot-pop3d', allow: "{{ cis_allow_mail_server }}" }
+    - { rule: '2.1.9',  package: 'nfs-kernel-server', allow: "{{ cis_allow_nfs_server }}" }
+    - { rule: '2.1.10', package: 'nis',           allow: false } # NIS is deprecated/insecure always
+    - { rule: '2.1.11', package: 'cups',          allow: "{{ cis_allow_print_server }}" }
+    - { rule: '2.1.12', package: 'rpcbind',       allow: "{{ cis_allow_rpcbind }}" }
+    - { rule: '2.1.13', package: 'rsync',         allow: "{{ cis_allow_rsync_server }}" }
+    - { rule: '2.1.14', package: 'samba',         allow: "{{ cis_allow_samba }}" }
+    - { rule: '2.1.15', package: 'snmpd',         allow: "{{ cis_allow_snmp }}" }
+    - { rule: '2.1.16', package: 'telnetd',       allow: false } # Telnet MUST be removed (use SSH)
+    - { rule: '2.1.17', package: 'tftpd-hpa',     allow: "{{ cis_allow_tftp_server }}" }
+    - { rule: '2.1.18', package: 'squid',         allow: "{{ cis_allow_web_proxy }}" }
+    - { rule: '2.1.19', package: 'apache2',       allow: "{{ cis_allow_web_server }}" }
+    - { rule: '2.1.19', package: 'nginx',         allow: "{{ cis_allow_web_server }}" }
+    - { rule: '2.1.20', package: 'xinetd',        allow: false } # Legacy super-server, remove it
+    - { rule: '2.1.20', package: 'openbsd-inetd', allow: false } 
+    - { rule: '2.1.21', package: 'xserver-xorg-core', allow: "{{ cis_allow_x11_server }}" }
+  when: not item.allow | bool
+  tags:
+    - cis_2.1
+    - services
+    - scored
+
+# 2.1.22 - Ensure mail transfer agents are configured for local-only mode
+# Si un serveur mail (ex: Postfix) est installé par défaut (souvent le cas sur Debian),
+# il ne doit écouter que sur localhost (127.0.0.1) pour ne pas être un relais de spam ouvert.
+- name: "2.1.22 | Ensure mail transfer agents are configured for local-only mode (Postfix)"
+  block:
+    - name: "2.1.22 | Configure Postfix to listen on localhost only"
+      ansible.builtin.lineinfile:
+        path: /etc/postfix/main.cf
+        regexp: '^inet_interfaces\s*='
+        line: 'inet_interfaces = loopback-only'
+        state: present
+      notify: restart-postfix
+  # On ne le fait que si Postfix est installé
+  when: "'postfix' in ansible_facts.packages"
+  tags:
+    - cis_2.1.22
+    - postfix
+    - scored
+
+# Cas spécifique : Masquer les services si on ne peut pas les désinstaller (Alternative)
+# Parfois, on ne veut pas désinstaller (ex: cups-libs) mais juste empêcher le service de tourner.
+- name: "2.1.x | Ensure services are masked if not removed"
+  ansible.builtin.systemd:
+    name: "{{ item.service }}"
+    enabled: false
+    state: stopped
+    masked: true
+  loop:
+    - { service: 'avahi-daemon', allow: "{{ cis_allow_avahi }}" }
+    - { service: 'cups',         allow: "{{ cis_allow_print_server }}" }
+    - { service: 'rpcbind',      allow: "{{ cis_allow_rpcbind }}" }
+  when: not item.allow | bool
+  ignore_errors: yes # Ignore si le service n'existe pas déjà
+  tags:
+    - cis_2.1
+    - services

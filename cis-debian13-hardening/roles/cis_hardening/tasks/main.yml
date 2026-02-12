@@ -1,0 +1,73 @@
+- name: "CIS 1.1.1 | Disable unused filesystems"
+  ansible.builtin.include_tasks: 1.1.1_unused_filesystems.yml
+  tags:
+    - cis_1.1.1
+    - filesystem
+
+- name: "SECTION 1 | Package Management"
+  import_tasks: section1_packages.yml
+  tags: [cis_section1, packages]
+
+- name: "SECTION 1 | Mandatory Access Control (AppArmor)"
+  import_tasks: section1_mac.yml
+  tags:
+    - cis_section1
+    - mac
+    - apparmor
+
+- name: "SECTION 1 | Bootloader Configuration"
+  import_tasks: section1_bootloader.yml
+  tags:
+    - cis_section1
+    - bootloader
+
+- name: "SECTION 1 | Additional Process Hardening"
+  import_tasks: section1_process_hardening.yml
+  tags:
+    - cis_section1
+    - process_hardening
+
+- name: "SECTION 1 | Desktop Environment (GDM)"
+  import_tasks: section1_desktop.yml
+  tags:
+    - cis_section1
+    - cis_1.7
+    - gui
+
+- name: "SECTION 2 | Server Services Configuration"
+  import_tasks: section2_services.yml
+  tags:
+    - cis_section2
+    - services
+
+
+- name: "SECTION 2 | Client Services Configuration"
+  import_tasks: section2_clients.yml
+  tags:
+    - cis_section2
+    - clients
+
+- name: "SECTION 2 | Time Synchronization (Chrony)"
+  import_tasks: section2_time.yml
+  tags:
+    - cis_section2
+    - time
+
+- name: "SECTION 2 | Job Schedulers (Cron)"
+  import_tasks: section2_scheduler.yml
+  tags:
+    - cis_section2
+    - cron
+
+- name: "SECTION 3 | Network Configuration (Sysctl / IPv6)"
+  import_tasks: section3_network.yml
+  tags:
+    - cis_section3
+    - network
+
+- name: "SECTION 4 | Host Based Firewall (Nftables)"
+  import_tasks: section4_nftables.yml
+  tags:
+    - cis_section4
+    - firewall
+    - nftables

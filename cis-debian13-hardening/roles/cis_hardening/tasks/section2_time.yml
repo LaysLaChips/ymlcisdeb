@@ -1,0 +1,88 @@
+---
+# ==============================================================================
+# SECTION 2.3 - Time Synchronization (Chrony)
+# ==============================================================================
+
+# 2.3.1 - Ensure time synchronization is in use
+# ÉTAPE 1 : On désactive les concurrents pour éviter les conflits
+- name: "2.3.1 | Ensure systemd-timesyncd is stopped and masked"
+  ansible.builtin.systemd:
+    name: systemd-timesyncd
+    state: stopped
+    enabled: no
+    masked: yes # "masked" empêche tout autre service de le redémarrer accidentellement
+  tags:
+    - cis_2.3.1
+    - time
+    - chrony
+
+- name: "2.3.1 | Ensure ntp (legacy) is not installed"
+  ansible.builtin.package:
+    name: ntp
+    state: absent
+  tags:
+    - cis_2.3.1
+    - time
+
+# ÉTAPE 2 : On installe Chrony
+- name: "2.3.1 | Ensure chrony is installed"
+  ansible.builtin.package:
+    name: chrony
+    state: present
+  tags:
+    - cis_2.3.1
+    - time
+    - scored
+
+# 2.3.3 - Ensure chrony is configured
+# Cette tâche génère un fichier de configuration propre.
+# Elle utilise la variable 'cis_ntp_servers' définie dans defaults/main.yml.
+- name: "2.3.3 | Ensure chrony is configured"
+  ansible.builtin.copy:
+    dest: /etc/chrony/chrony.conf
+    content: |
+      # Fichier généré par Ansible - CIS Hardening
+      
+      # Configuration des serveurs (depuis variables Ansible)
+      {% for server in cis_ntp_servers %}
+      server {{ server }} iburst
+      {% endfor %}
+
+      # Utiliser le fichier de dérive pour la précision
+      driftfile /var/lib/chrony/chrony.drift
+
+      # Log directory
+      logdir /var/log/chrony
+
+      # Maximum updates to skew
+      maxupdateskew 100.0
+
+      # Step the system clock instead of slewing it if the adjustment is larger than
+      # one second, but only in the first three clock updates.
+      makestep 1 3
+
+      # CIS 2.3.3 - Ensure chrony runs as user '_chrony'
+      # Sur Debian, c'est l'utilisateur par défaut pour ce service.
+      user _chrony
+      
+      # Sécurité : Ne pas écouter sur le port de commande si non nécessaire
+      # (ou restreindre à localhost avec 'bindcmdaddress 127.0.0.1')
+      # Par défaut sur Debian, c'est sécurisé, mais on s'assure que cmdport n'est pas ouvert au monde.
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart-chrony
+  tags:
+    - cis_2.3.3
+    - time
+    - scored
+
+# On s'assure que le service tourne
+- name: "2.3.x | Ensure chrony is enabled and running"
+  ansible.builtin.service:
+    name: chrony
+    state: started
+    enabled: yes
+  tags:
+    - cis_2.3
+    - time

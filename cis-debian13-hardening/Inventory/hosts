@@ -1,0 +1,19 @@
+all:
+  children:
+    # Groupe des Serveurs (Pas d'interface graphique)
+    servers:
+      hosts:
+        bdd-prod-01:
+        web-front-01:
+      vars:
+        cis_enable_gui: false  # C'est la valeur par défaut, mais on explicite
+
+    # Groupe des Postes Admins (Interface graphique autorisée)
+    workstations:
+      hosts:
+        admin-laptop-01:
+        admin-pc-02:
+      vars:
+        cis_enable_gui: true   # ACTIVE l'exception pour ce groupe
+        cis_allow_telnet_client: false # Exception : Les admins ont le droit d'avoir telnet et ldap-utils pour debug
+        cis_allow_ldap_client: false

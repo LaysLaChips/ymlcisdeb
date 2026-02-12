@@ -1,0 +1,66 @@
+---
+# ==============================================================================
+# SECTION 1.7 - GNOME Display Manager (GDM)
+# ==============================================================================
+# NOUVELLE NUMÉROTATION CIS DEBIAN 13
+# 1.7.1 : Ensure GDM is removed (Serveurs)
+# 1.7.2 : Ensure GDM login banner is configured (Workstations)
+# 1.7.3 : Ensure disable-user-list is enabled (Workstations)
+# 1.7.4 : Ensure GDM screen locks when the user is idle (Workstations)
+
+# CAS 1 : SERVEURS (cis_enable_gui == false)
+# Suppression de l'interface graphique pour réduire la surface d'attaque.
+- name: "1.7.1 | Ensure GNOME Display Manager is removed (Server Mode)"
+  ansible.builtin.package:
+    name: gdm3
+    state: absent
+  when: not cis_enable_gui | bool
+  tags:
+    - cis_1.7.1
+    - cis_1.7
+    - gui
+    - scored
+
+# CAS 2 : POSTES ADMINS (cis_enable_gui == true)
+# Sécurisation de l'interface graphique sans la supprimer.
+- name: "1.7.x | Secure GDM configuration (Workstation Mode)"
+  block:
+    # On s'assure que GDM est présent
+    - name: "Ensure GDM is installed"
+      ansible.builtin.package:
+        name: gdm3
+        state: present
+
+    # 1.7.2 - Bannière de login
+    - name: "1.7.2 | Ensure GDM login banner is configured"
+      ansible.builtin.copy:
+        dest: /etc/gdm3/greeter.d-conf-defaults
+        content: |
+          [org/gnome/login-screen]
+          banner-message-enable=true
+          banner-message-text='ACCES RESTREINT. TOUTE ACTIVITE EST SURVEILLEE.'
+          disable-user-list=true
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart-gdm
+
+    # 1.7.3 - Désactiver la liste des utilisateurs
+    # (Géré via le fichier ci-dessus 'disable-user-list=true', mais on peut forcer dconf si besoin)
+
+    # 1.7.4 - Verrouillage automatique de l'écran (Screen Lock)
+    # C'est une règle souvent demandée pour les postes de travail (timeout 900s = 15min)
+    - name: "1.7.4 | Ensure GDM screen locks when the user is idle"
+      ansible.builtin.dconf:
+        key: "/org/gnome/desktop/session/idle-delay"
+        value: "uint32 900"
+        state: present
+      become_user: gdm
+      ignore_errors: yes 
+
+  # Condition globale pour le bloc
+  when: cis_enable_gui | bool
+  tags:
+    - cis_1.7
+    - gui
+    - workstation

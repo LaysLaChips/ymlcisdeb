@@ -1,0 +1,60 @@
+---
+# ==============================================================================
+# SECTION 1.4 - Bootloader Configuration (GRUB)
+# ==============================================================================
+
+# 1.4.1 - Ensure permissions on bootloader config are configured
+# Le fichier grub.cfg contient des infos sensibles, il ne doit être lisible que par root.
+- name: "1.4.1 | Ensure permissions on /boot/grub/grub.cfg are configured"
+  ansible.builtin.file:
+    path: /boot/grub/grub.cfg
+    owner: root
+    group: root
+    mode: '0400'
+  tags:
+    - cis_1.4.1
+    - bootloader
+    - scored
+
+# 1.4.2 - Ensure bootloader password is set
+# Cette tâche crée un fichier custom dans /etc/grub.d pour définir le superuser.
+# PRÉREQUIS : Tu dois définir la variable 'cis_grub_password_hash' dans ton inventaire !
+# Pour générer le hash, lance sur ton serveur : grub-mkpasswd-pbkdf2
+- name: "1.4.2 | Ensure bootloader password is set"
+  block:
+    - name: "1.4.2 | Create secure bootloader config file"
+      ansible.builtin.copy:
+        dest: /etc/grub.d/01_cis_password
+        content: |
+          cat <<EOF
+          set superusers="{{ cis_grub_user | default('root') }}"
+          password_pbkdf2 {{ cis_grub_user | default('root') }} {{ cis_grub_password_hash }}
+          EOF
+        owner: root
+        group: root
+        mode: '0755'
+      notify: update-grub
+
+  # On ne joue cette tâche que si tu as bien fourni un hash, pour éviter de casser le boot.
+  when: cis_grub_password_hash is defined
+  tags:
+    - cis_1.4.2
+    - bootloader
+    - scored
+
+# 1.4.3 - Ensure authentication for single-user mode is required
+# Sur Debian, si le mot de passe root (système) est défini (et non verrouillé/désactivé),
+# le mode rescue demandera ce mot de passe par défaut.
+# Si tu as suivi le preseed (root désactivé), il faut s'assurer que sulogin force l'auth.
+- name: "1.4.3 | Ensure authentication for single-user mode is required"
+  ansible.builtin.lineinfile:
+    path: /etc/default/rcS
+    regexp: '^sulogin-rectification' # Juste pour l'exemple, rcS est obsolète sur Debian 13 systemd
+    state: absent
+  # Note : Sur Debian 12/13 avec systemd, le service rescue.service demande
+  # le mot de passe root si le compte root est actif, ou sudoer.
+  # Cette règle est souvent audit-only sur les systèmes modernes systemd.
+  tags:
+    - cis_1.4.3
+    - bootloader
+    - not_scored

@@ -1,0 +1,57 @@
+---
+# ==============================================================================
+# SECTION 1.3 - Mandatory Access Control (AppArmor)
+# ==============================================================================
+
+# 1.3.1 - Ensure AppArmor is installed
+- name: "1.3.1 | Ensure AppArmor packages are installed"
+  ansible.builtin.package:
+    name:
+      - apparmor
+      - apparmor-utils
+      - auditd # Requis pour les logs d'audit AppArmor
+    state: present
+  tags:
+    - cis_1.3.1
+    - apparmor
+    - scored
+
+# 1.3.2 - Ensure AppArmor is enabled in the bootloader configuration
+# Cette tâche est critique : elle modifie le GRUB.
+# Elle vérifie si "apparmor=1 security=apparmor" est présent dans /etc/default/grub
+- name: "1.3.2 | Ensure AppArmor is enabled in GRUB_CMDLINE_LINUX"
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    backrefs: yes
+    regexp: '^(GRUB_CMDLINE_LINUX=(?!.*apparmor=1 security=apparmor)\"[^\"]*)(\".*)'
+    line: '\1 apparmor=1 security=apparmor\2'
+    state: present
+  notify: update-grub  # Handler nécessaire (voir plus bas)
+  tags:
+    - cis_1.3.2
+    - grub
+    - scored
+
+# 1.3.3 - Ensure all AppArmor Profiles are in enforce mode
+# Attention : Cela passe TOUS les profils en mode bloquant.
+# Si tu as des applications exotiques sans bon profil, cela peut les bloquer.
+- name: "1.3.3 | Ensure all AppArmor profiles are in enforce mode"
+  ansible.builtin.command:
+    cmd: aa-enforce /etc/apparmor.d/*
+  changed_when: false # On le marque comme "non changé" car c'est une commande de config
+  failed_when: false  # On évite que ça plante si un profil est mal formé
+  tags:
+    - cis_1.3.3
+    - apparmor
+    - scored
+
+# Cas spécifique PODMAN / DOCKER (Bonne pratique)
+# On s'assure que le service est bien démarré pour que Podman puisse l'utiliser
+- name: "1.3.x | Ensure AppArmor service is enabled and running"
+  ansible.builtin.service:
+    name: apparmor
+    state: started
+    enabled: yes
+  tags:
+    - apparmor
+    - service

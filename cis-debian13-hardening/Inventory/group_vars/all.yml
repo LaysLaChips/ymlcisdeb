@@ -1,0 +1,3 @@
+# Variable pour le CIS 1.4.2
+cis_grub_user: "root"
+cis_grub_password_hash: "grub.pbkdf2.sha512.10000.C8F2... (ton hash complet ici)"

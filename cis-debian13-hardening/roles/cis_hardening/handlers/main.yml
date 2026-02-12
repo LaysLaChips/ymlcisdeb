@@ -1,0 +1,27 @@
+- name: update-grub
+  ansible.builtin.command: update-grub
+  listen: "update-grub"
+
+- name: restart-gdm
+  ansible.builtin.service:
+    name: gdm3
+    state: restarted
+  listen: "restart-gdm"
+
+- name: restart-postfix
+  ansible.builtin.service:
+    name: postfix
+    state: restarted
+  listen: "restart-postfix"
+
+- name: restart-chrony
+  ansible.builtin.service:
+    name: chrony
+    state: restarted
+  listen: "restart-chrony"
+
+- name: reload-nftables
+  ansible.builtin.service:
+    name: nftables
+    state: reloaded
+  listen: "reload-nftables"

@@ -1,0 +1,123 @@
+---
+# ==============================================================================
+# SECTION 3 - Network Configuration
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 3.1 - Disable Unused Network Protocols (IPv6, Wireless, TIPC...)
+# ------------------------------------------------------------------------------
+
+# 3.1.1 - Disable IPv6
+# Désactivation au niveau du chargeur de démarrage (GRUB)
+- name: "3.1.1 | Disable IPv6 via GRUB (Bootloader)"
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    backrefs: yes
+    regexp: '^(GRUB_CMDLINE_LINUX=(?!.*ipv6.disable=1)\"[^\"]*)(\".*)'
+    line: '\1 ipv6.disable=1\2'
+    state: present
+  when: cis_disable_ipv6 | bool
+  notify: update-grub
+  tags:
+    - cis_3.1.1
+    - ipv6
+    - grub
+    - scored
+
+# Désactivation au niveau du noyau (Runtime)
+- name: "3.1.1 | Disable IPv6 via Sysctl (Kernel Runtime)"
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: '1'
+    state: present
+    reload: yes
+  loop:
+    - net.ipv6.conf.all.disable_ipv6
+    - net.ipv6.conf.default.disable_ipv6
+    - net.ipv6.conf.lo.disable_ipv6
+  when: cis_disable_ipv6 | bool
+  tags:
+    - cis_3.1.1
+    - ipv6
+    - sysctl
+
+# 3.1.2 - Ensure wireless interfaces are disabled
+- name: "3.1.2 | Ensure wireless interfaces are disabled"
+  ansible.builtin.command: "nmcli radio wifi off"
+  when: "'NetworkManager' in ansible_facts.packages"
+  failed_when: false
+  tags:
+    - cis_3.1.2
+    - wireless
+    - scored
+
+# 3.1.x - Disable Uncommon Network Protocols
+- name: "3.1.x | Ensure uncommon network protocols are disabled"
+  ansible.builtin.copy:
+    dest: "/etc/modprobe.d/{{ item }}.conf"
+    content: "install {{ item }} /bin/true\n"
+    mode: '0644'
+  loop:
+    - dccp
+    - sctp
+    - rds
+    - tipc
+  tags:
+    - cis_3.1
+    - protocols
+    - scored
+
+# ------------------------------------------------------------------------------
+# 3.2 & 3.3 - Network Parameters (Host Only - Sysctl)
+# ------------------------------------------------------------------------------
+
+- name: "3.2/3.3 | Configure Network Kernel Parameters (Sysctl)"
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    # 3.2.1 - Ensure packet redirect sending is disabled
+    - { name: 'net.ipv4.conf.all.send_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.default.send_redirects', value: '0' }
+
+    # 3.2.2 - Ensure IP forwarding is disabled
+    # FORCÉ À 0 : Ce serveur n'est pas un routeur.
+    - { name: 'net.ipv4.ip_forward', value: '0' }
+
+    # 3.3.1 - Ensure source routed packets are not accepted
+    - { name: 'net.ipv4.conf.all.accept_source_route', value: '0' }
+    - { name: 'net.ipv4.conf.default.accept_source_route', value: '0' }
+
+    # 3.3.2 - Ensure ICMP redirects are not accepted
+    - { name: 'net.ipv4.conf.all.accept_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.default.accept_redirects', value: '0' }
+
+    # 3.3.3 - Ensure secure ICMP redirects are not accepted
+    - { name: 'net.ipv4.conf.all.secure_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.default.secure_redirects', value: '0' }
+
+    # 3.3.4 - Ensure suspicious packets are logged (Martians)
+    - { name: 'net.ipv4.conf.all.log_martians', value: '1' }
+    - { name: 'net.ipv4.conf.default.log_martians', value: '1' }
+
+    # 3.3.5 - Ensure broadcast ICMP requests are ignored
+    - { name: 'net.ipv4.icmp_echo_ignore_broadcasts', value: '1' }
+
+    # 3.3.6 - Ensure bogus ICMP responses are ignored
+    - { name: 'net.ipv4.icmp_ignore_bogus_error_responses', value: '1' }
+
+    # 3.3.7 - Ensure Reverse Path Filtering is enabled
+    - { name: 'net.ipv4.conf.all.rp_filter', value: '1' }
+    - { name: 'net.ipv4.conf.default.rp_filter', value: '1' }
+
+    # 3.3.8 - Ensure TCP SYN Cookies is enabled
+    - { name: 'net.ipv4.tcp_syncookies', value: '1' }
+
+  tags:
+    - cis_3.2
+    - cis_3.3
+    - network
+    - sysctl
+    - scored
